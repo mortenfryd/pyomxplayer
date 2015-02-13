@@ -6,7 +6,6 @@ from time import sleep
 
 class OMXPlayer(object):
 
-    _FILEPROP_REXP = re.compile(r".*audio streams (\d+) video streams (\d+) chapters (\d+) subtitles (\d+).*")
     _VIDEOPROP_REXP = re.compile(r".*Video codec ([\w-]+) width (\d+) height (\d+) profile (\d+) fps ([\d.]+).*")
     _AUDIOPROP_REXP = re.compile(r"Audio codec (\w+) channels (\d+) samplerate (\d+) bitspersample (\d+).*")
     _STATUS_REXP = re.compile(r"V :\s*([\d.]+).*")
@@ -19,18 +18,32 @@ class OMXPlayer(object):
     _QUIT_CMD = 'q'
     _VOLUP_CMD = '+'
     _VOLDOWN_CMD = '-'
-    _WINSIZE_CMD = "--win \'%s %s %s %s\' "  
+    _WINSIZE_CMD = " --win '%s %s %s %s' "  
 
     paused = False
     subtitles_visible = True
     volume = 0.0
+    args = ""
+    mediafile = ""
+    
 
     def __init__(self, mediafile, args=None, start_playback=False):
         if not args:
-            args = ""
-        cmd = self._LAUNCH_CMD % (mediafile, args)
+            self.args = ""
+        else:
+            self.args = args
+
+        self.mediafile = mediafile
+
+        if start_playback:
+            self.paused = not start_playback
+            self.start()
+            
+
+    def start(self):
+        cmd = self._LAUNCH_CMD % (self.mediafile, self.args)
         self._process = pexpect.spawn(cmd)
-        
+
         self.video = dict()
         self.audio = dict()
 
@@ -52,11 +65,6 @@ class OMXPlayer(object):
         self._position_thread = Thread(target=self._get_position)
         self._position_thread.start()
 
-        if not start_playback:
-            self.toggle_pause()
-
-
-
     def _get_position(self):
         while True:
             index = self._process.expect([self._STATUS_REXP,
@@ -77,7 +85,7 @@ class OMXPlayer(object):
             self._process.send(self._VOLUP_CMD)
             index = self._process.expect([self._VOLUPDOWN_REXP,
                                             pexpect.TIMEOUT,
-                                            pexpect.EOF],timeout=1)
+                                            pexpect.EOF])
             if index == 0:
                 self.volume = float(self._process.match.group(1))
             
@@ -86,13 +94,14 @@ class OMXPlayer(object):
             self._process.send(self._VOLDOWN_CMD)
             index = self._process.expect([self._VOLUPDOWN_REXP,
                                             pexpect.TIMEOUT,
-                                            pexpect.EOF],timeout=1)
+                                            pexpect.EOF])
             if index == 0:
                 self.volume = float(self._process.match.group(1))
             
 
-    def set_display_size(self, x, y, width, height)
-        displaycmd = self._WINSIZE_CMD % (x, y, width, height)
+    def set_display_size(self, x, y, width, height):
+        cmd = self._WINSIZE_CMD % (x, y, x+width, y+height)
+        self.args = self.args + cmd
     
     #def toggle_subtitles(self):
     #    if self._process.send(self._TOGGLE_SUB_CMD):
